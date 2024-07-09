@@ -1,5 +1,3 @@
-import jsyaml from 'js-yaml';
-
 function handleRegionChange() {
   const regionSelect = document.getElementById('regionSelect');
   // const customRegionInput = document.getElementById('customRegionInput');
