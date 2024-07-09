@@ -1,0 +1,20 @@
+{
+  "name": "sysdig-agent-installation",
+  "version": "1.0.0",
+  "description": "### Product * Agent and Node Analyzer for Sysdig Platform",
+  "main": "index.js",
+  "scripts": {
+  "predeploy": "npm run build",
+  "deploy": "gh-pages -d .",
+  "build": "npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.1.1"
+  }
+}

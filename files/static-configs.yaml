@@ -1,0 +1,40 @@
+global:
+  sysdig:
+    region: "us3"
+agent:
+  slim:
+    enabled: false
+  auditLog:
+    enabled: false
+  sysdig:
+    settings:
+      prometheus:
+        enabled: false
+nodeAnalyzer:
+  enabled: true
+  nodeAnalyzer:
+    sslVerifyCertificate: false
+    imageAnalyzer:
+      deploy: false
+    benchmarkRunner:
+      deploy: false
+    hostAnalyzer:
+      deploy: false
+    hostScanner:
+      deploy: false
+    runtimeScanner:
+      deploy: false
+clusterShield:
+  enabled: true
+  cluster_shield:
+    features:
+      admission_control:
+        enabled: false
+        container_vulnerability_management:
+          enabled: true
+      container_vulnerability_management:
+        enabled: false
+      audit:
+        enabled: false
+      posture:
+        enabled: false
