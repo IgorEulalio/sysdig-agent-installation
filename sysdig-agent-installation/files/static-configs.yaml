@@ -23,16 +23,18 @@ nodeAnalyzer:
     hostScanner:
       deploy: false
     runtimeScanner:
-      deploy: true
-      settings:
-        maxImageSizeAllowed: "2147483648"
-        maxFileSizeAllowed: "500000000"
-      eveConnector:
-        deploy: false
-      resources:
-        requests:
-          ephemeral-storage: 3Gi
-        limits:
-          cpu: 1000m
-          memory: 4Gi
-          ephemeral-storage: 6Gi
+      deploy: false
+clusterShield:
+  enabled: true
+  cluster_shield:
+    features:
+      admission_control:
+        enabled: false
+        container_vulnerability_management:
+          enabled: true
+      container_vulnerability_management:
+        enabled: false
+      audit:
+        enabled: false
+      posture:
+        enabled: false

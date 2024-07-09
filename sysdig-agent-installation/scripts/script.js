@@ -27,34 +27,14 @@ function toggleRegionOptions() {
   updateOutput()
 }
 
-// function handlePlatformChange() {
-//   const regionSelect = document.getElementById('platformSelect');
-//   updateOutput()
-// }
-
-// function handleEnvironmentChange() {
-//   const regionSelect = document.getElementById('environmentSelect');
-//   updateOutput()
-// }
-
-// Close dropdown options when clicking outside
-// document.addEventListener('click', function (event) {
-//   // const options = document.getElementById('regionOptions');
-//   const select = document.getElementById('regionSelect');
-
-//   if (event.target !== select) {
-//     options.style.display = 'none';
-//   }
-// });
-
 function toggleRegistryInputs(checkboxId, inputsContainerId) {
   let params = generateUserInputParamObject()
   const checkbox = document.getElementById(checkboxId);
   const inputsContainer = document.getElementById(inputsContainerId);
 
   if (checkbox.checked) {
-    const registry_fields = ["Internal Registry", "Internal Registry Pull Secret", "Internal Sysdig Agent Image", "Internal Sysdig Runtime Scanner Image", "Sysdig Agent Tag", "Sysdig Runtime Scanner Tag"];
-    const registry_placeholders = ["quay.io", "", "sysdig/agent", "sysdig/vuln-runtime-scanner", params.agentTagsSelect.value, params.runtimeScannerTagsSelect.value];
+    const registry_fields = ["Internal Registry", "Internal Registry Pull Secret", "Internal Sysdig Agent Image", "Internal Sysdig ClusterShield Image", "Sysdig Agent Tag", "Sysdig ClusterShield Tag"];
+    const registry_placeholders = ["quay.io", "", "sysdig/agent", "sysdig/cluster-shield", params.agentTagsSelect.value, params.clusterShieldTagsSelect.value];
     // Clear existing inputs
     inputsContainer.innerHTML = '';
 
@@ -139,7 +119,7 @@ function createTextInput(labelText, inputName, required, value) {
 
   const label = document.createElement('label');
   label.textContent = labelText;
-  
+
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -187,7 +167,7 @@ function toggleInput(checkboxId, inputId) {
 
 function setClusterName(params) {
   let clusterName = "";
-  if (params.businessUnit != ""){
+  if (params.businessUnit != "") {
     clusterName += params.businessUnit + "-";
   }
   if (params.platform != "") {
@@ -225,6 +205,11 @@ function setHelmCommandGlobalConfigs(params) {
     helmCommandGlobalConfigs += "<br>&nbsp&nbsp; --set global.proxy.noProxy=\"" + escapedNoProxyList + "\" \\";
   }
 
+  if (params.enablePosture.checked) {
+    helmCommandGlobalConfigs += "<br>&nbsp;&nbsp; --set global.kspm.deploy=true" + " \\";
+    helmCommandGlobalConfigs += "<br>&nbsp;&nbsp; --set kspmCollector.enabled=false" + " \\";
+  }
+
   return helmCommandGlobalConfigs
 }
 
@@ -238,25 +223,24 @@ function setGlobalConfigs(params) {
       clusterConfig: {
         name: setClusterName(params),
       },
-      // kspm: {
-      //   deploy: params.kspmCheckbox.checked
-      // }
     }
   }
-
-  // if (Object.keys(params.clusterTags).length > 0) {
-  //   globalConfigs.global.sysdig.tags = params.clusterTags
-  // }
-
-  // if (params.registryCheckbox.checked) {
-  //   globalConfigs.global.imageRegistry = params.registryInputs[0].value ;
-  // }
 
   if (params.proxyCheckbox.checked) {
     globalConfigs.global.proxy = {
       httpProxy: "http://" + params.proxyInputs[0].value + ":" + params.proxyInputs[1].value,
       httpsProxy: "http://" + params.proxyInputs[0].value + ":" + params.proxyInputs[1].value,
       noProxy: params.proxyInputs[2].value
+    }
+  }
+
+  if (params.enablePosture.checked) {
+    globalConfigs.global.kspm = {
+      deploy: true,
+    }
+
+    globalConfigs.kspmCollector = {
+      enabled: false,
     }
   }
 
@@ -296,19 +280,11 @@ function setAgentConfigs(params) {
     },
   }
 
-  // if (params.regionInput === "custom") {
-  //   agentConfigs.agent.collectorSettings = {
-  //     collectorHost: params.customCollectorUrl,
-  //     collectorPort: params.customCollectorPort,
-  //     sslVerifyCertificate: false,
-  //   }
-  // }
-
   if (params.proxyCheckbox.checked) {
     agentConfigs.agent.sysdig.settings.http_proxy = {
-        proxy_host: params.proxyInputs[0].value,
-        proxy_port: params.proxyInputs[1].value,
-      }
+      proxy_host: params.proxyInputs[0].value,
+      proxy_port: params.proxyInputs[1].value,
+    }
   }
 
   if (params.registryCheckbox.checked) {
@@ -339,30 +315,15 @@ function setAgentConfigs(params) {
     agentConfigs.agent.priorityClassName = params.priorityInput
   }
 
-  // if (params.agentProfileInput === "Monitor-only") {
-  //   agentConfigs.agent.monitor = { enabled: true }
-  //   agentConfigs.agent.secure = { enabled: false }
-  // } else if (params.agentProfileInput === "Secure-only") {
-  //   agentConfigs.agent.monitor = { enabled: false }
-  //   agentConfigs.agent.secure = { enabled: true }
-  //   agentConfigs.agent.sysdig.settings["60s_flush_enable"] = true
-  // } else if (params.agentProfileInput === "Secure light") {
-  //   agentConfigs.agent.monitor = { enabled: false }
-  //   agentConfigs.agent.secure = { enabled: true }
-  //   agentConfigs.agent.sysdig.settings.feature = { mode: "secure_light" }
-  //   agentConfigs.agent.sysdig.settings["60s_flush_enable"] = true
-  // }
-
   return agentConfigs
 }
 
-
 function setHelmCommandAgentConfigs(params) {
   let helmCommandAgentConfigs = "";
-  helmCommandAgentConfigs += "<br>&nbsp&nbsp; --set agent.sysdig.settings.tags=" + "\"cluster:" + params.businessUnit + "-" + 
-  params.platform + "-" + params.environment + "-" + params.vastId + "-" + params.vsadId + "\\," +
-   "vz-vsadid:" + params.vsadId +"\\," + "vz-vastid:" + params.vastId + "\" \\";
-  
+  helmCommandAgentConfigs += "<br>&nbsp&nbsp; --set agent.sysdig.settings.tags=" + "\"cluster:" + params.businessUnit + "-" +
+    params.platform + "-" + params.environment + "-" + params.vastId + "-" + params.vsadId + "\\," +
+    "vz-vsadid:" + params.vsadId + "\\," + "vz-vastid:" + params.vastId + "\" \\";
+
   if (params.platform === "gke") {
     helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.ebpf.enabled=true \\";
   }
@@ -370,24 +331,23 @@ function setHelmCommandAgentConfigs(params) {
   if (params.proxyCheckbox.checked) {
     helmCommandAgentConfigs += "<br>&nbsp&nbsp; --set agent.sysdig.settings.http_proxy.proxy_host=" + params.proxyInputs[0].value + " \\";
     helmCommandAgentConfigs += "<br>&nbsp&nbsp; --set agent.sysdig.settings.http_proxy.proxy_port=" + params.proxyInputs[1].value + " \\";
-
-  } 
+  }
 
   if (params.registryCheckbox.checked) {
     helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.image.tag=" + params.registryInputs[4].value + " \\";
     helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.image.registry=" + params.registryInputs[0].value + " \\";
     helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.image.repository=" + params.registryInputs[2].value + " \\";
-    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.image.registry=" + params.registryInputs[0].value + " \\";
-    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.image.repository=" + params.registryInputs[3].value + " \\";
-    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.image.tag=" + params.registryInputs[5].value + " \\";
-    if (params.registryInputs[1].value != ""){
+    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set clusterShield.image.repository=" + params.registryInputs[3].value + " \\";
+    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set clusterShield.image.registry=" + params.registryInputs[0].value + " \\";
+    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set clusterShield.image.tag=" + params.registryInputs[5].value + " \\";
+    if (params.registryInputs[1].value != "") {
       helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.image.pullSecrets=" + params.registryInputs[1].value + " \\";
-      helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.pullSecrets=" + params.registryInputs[1].value + " \\";
+      helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set clusterShield.imagePullSecrets=" + params.registryInputs[1].value + " \\";
     }
   }
   else {
     helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set agent.image.tag=" + params.agentTagsSelect.value + " \\";
-    helmCommandAgentConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.image.tag=" + params.runtimeScannerTagsSelect.value + " \\";
+
   }
 
   if (params.priorityCheckbox.checked) {
@@ -397,31 +357,87 @@ function setHelmCommandAgentConfigs(params) {
   return helmCommandAgentConfigs
 }
 
-function setHelmCommandNodeAnalyzerRuntimeConfigs(params) {
-  let helmCommandNodeAnalyzerRuntimeConfigs = "";
-  let maxImageSize = '2147483648'
-  let ephemeralStorageRequestGigabytes = '3Gi'
-  let ephemeralStorageLimitGigabytes = '6Gi'
-  let memoryLimitGigabytes = '4Gi'
-  if (params.imageSizeInput != null && parseInt(params.imageSizeInput.value) > parseInt(maxImageSize)) {
-    maxImageSize = params.imageSizeInput.value
-    let ephemeralStorageRequestBytes = 1.5 * maxImageSize;
-    ephemeralStorageRequestGigabytes = Math.ceil(convertBytesToGigabytes(ephemeralStorageRequestBytes)) + 'Gi';
-    let ephemeralStorageLimitBytes = 3 * maxImageSize;
-    ephemeralStorageLimitGigabytes = Math.ceil(convertBytesToGigabytes(ephemeralStorageLimitBytes)) + 'Gi';
-    let memoryLimitBytes = 2 * maxImageSize;
-    memoryLimitGigabytes = Math.ceil(convertBytesToGigabytes(memoryLimitBytes)) + 'Gi';
+function setHelmCommandClusterShield(params) {
+  let helmCommandClusterScanner = "";
 
-    helmCommandNodeAnalyzerRuntimeConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.settings.maxImageSizeAllowed=" + maxImageSize + "\\";
-    helmCommandNodeAnalyzerRuntimeConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.resources.requests.ephemeral-storage=" + ephemeralStorageRequestGigabytes + "\\";
-    helmCommandNodeAnalyzerRuntimeConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.resources.limits.memory=" + memoryLimitGigabytes + "\\";
-    helmCommandNodeAnalyzerRuntimeConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.resources.limits.ephemeral-storage=" + ephemeralStorageLimitGigabytes + "\\";
+  helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.enabled=true" + " \\";
+  helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.cluster_shield.features.container_vulnerability_management.enabled=true" + " \\";
+  if (params.enableAdmissionControl.checked) {
+    helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.cluster_shield.features.admission_control.enabled=true" + " \\";
   }
-  if (params.platform === "ocp") {
-    helmCommandNodeAnalyzerRuntimeConfigs += "<br>&nbsp;&nbsp; --set nodeAnalyzer.nodeAnalyzer.runtimeScanner.env.SCANNER_RUN_TIMEOUT=3h \\";
+  if (params.enableAudit.checked) {
+    helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.cluster_shield.features.audit.enabled=true" + " \\";
+  }
+  if (params.enablePosture.checked) {
+    helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.cluster_shield.features.posture.enabled=true" + " \\";
+  }
+  helmCommandClusterScanner += "<br>&nbsp;&nbsp; --set clusterShield.image.tag=" + params.clusterShieldTagsSelect.value + " \\";
+
+  return helmCommandClusterScanner;
+}
+
+function setClusterShieldConfigs(params) {
+  let clusterShieldConfigs = {
+    clusterShield: {
+      enabled: true,
+      cluster_shield: {
+        features: {
+          container_vulnerability_management: {
+            enabled: true,
+          },
+          admission_control: {
+            enabled: false,
+          },
+          audit: {
+            enabled: false,
+          },
+          posture: {
+            enabled: false,
+          }
+        }
+      },
+      image: {
+        tag: params.clusterShieldTagsSelect.value
+      }
+    },
   }
 
-  return helmCommandNodeAnalyzerRuntimeConfigs;
+  if (params.enableAdmissionControl.checked) {
+    clusterShieldConfigs.clusterShield.cluster_shield.features.admission_control = {
+      enabled: true,
+    }
+  }
+  if (params.enableAudit.checked) {
+    clusterShieldConfigs.clusterShield.cluster_shield.features.audit = {
+      enabled: true,
+    }
+  }
+
+  if (params.enablePosture.checked) {
+    clusterShieldConfigs.clusterShield.cluster_shield.features.posture = {
+      enabled: true,
+    }
+  }
+
+  if (params.registryCheckbox.checked) {
+    clusterShieldConfigs.clusterShield.image = {
+      registry: params.registryInputs[0].value,
+      repository: params.registryInputs[3].value,
+      tag: params.registryInputs[5].value,
+    }
+    if (params.registryInputs[1].value != "") {
+      clusterShieldConfigs.clusterShield.image = {
+        pullSecrets: params.registryInputs[1].value,
+      }
+    }
+  }
+  else {
+    clusterShieldConfigs.clusterShield.image = {
+      tag: params.clusterShieldTagsSelect.value,
+    }
+  }
+
+  return clusterShieldConfigs
 }
 
 function setNodeAnalyzerConfigs(params) {
@@ -439,66 +455,25 @@ function setNodeAnalyzerConfigs(params) {
           deploy: false,
         },
         hostScanner: {
-          deploy: false,
+          deploy: true,
         },
         runtimeScanner: {
           deploy: false,
-        }
+        },
+
       },
     },
   }
-  nodeAnalyzerConfigs = setNodeAnalyzerConfigsRuntimeScanner(params, nodeAnalyzerConfigs)
-
-  // if (params.regionInput === "custom") {
-  //   nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.sslVerifyCertificate = false
-  // }
-
-  // if (params.hostScannerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsHostScanner(params, nodeAnalyzerConfigs)
-  // }
-
-  // if (params.runtimeScannerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsRuntimeScanner(params, nodeAnalyzerConfigs)
-  // }
-
-  // if (params.imageAnalyzerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsImageAnalyzer(params, nodeAnalyzerConfigs)
-  // }
-
-  // if (params.hostAnalyzerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsHostAnalyzer(params, nodeAnalyzerConfigs)
-  // }
-
-  // if (params.benchmarkRunnerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsBenchmarkRunner(params, nodeAnalyzerConfigs)
-  // }
-
-  // if (params.kspmCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigsKSPMAnalyzer(params, nodeAnalyzerConfigs)
-  // }
 
   if (params.registryCheckbox.checked) {
     nodeAnalyzerConfigs.nodeAnalyzer.image = {
       registry: params.registryInputs[0].value
     }
-    nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.runtimeScanner.image = {
-      repository: params.registryInputs[3].value,
-      tag: params.registryInputs[5].value,
-    }
+
     if (params.registryInputs[1].value != "") {
       nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.pullSecrets = params.registryInputs[1].value;
     }
   }
-  else {
-    nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.runtimeScanner.image = {
-      tag: params.runtimeScannerTagsSelect.value,
-    }
-  }
-
-  // if (params.priorityCheckbox.checked) {
-  //   nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.priorityClassName = params.priorityInput
-  // }
-  
 
   return nodeAnalyzerConfigs
 }
@@ -512,74 +487,6 @@ function setNodeAnalyzerConfigsHostScanner(params, nodeAnalyzerConfigs) {
 
 function convertBytesToGigabytes(bytes) {
   return bytes / (1024 * 1024 * 1024);
-}
-
-function setNodeAnalyzerConfigsRuntimeScanner(params, nodeAnalyzerConfigs) {
-  // need to param imagesize allowed and resource requests/limits
-  let maxImageSize = '2147483648'
-  let ephemeralStorageRequestGigabytes = '3Gi'
-  let ephemeralStorageLimitGigabytes = '6Gi'
-  let memoryLimitGigabytes = '4Gi'
-  if (params.imageSizeInput != null && parseInt(params.imageSizeInput.value) > parseInt(maxImageSize)) {
-    maxImageSize = params.imageSizeInput.value
-    let ephemeralStorageRequestBytes = 1.5 * maxImageSize;
-    ephemeralStorageRequestGigabytes = Math.ceil(convertBytesToGigabytes(ephemeralStorageRequestBytes)) +'Gi';
-    let ephemeralStorageLimitBytes = 3 * maxImageSize;
-    ephemeralStorageLimitGigabytes = Math.ceil(convertBytesToGigabytes(ephemeralStorageLimitBytes)) + 'Gi';
-    let memoryLimitBytes = 2 * maxImageSize;
-    memoryLimitGigabytes = Math.ceil(convertBytesToGigabytes(memoryLimitBytes)) + 'Gi';
-  }
-
-  nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.runtimeScanner = {
-    deploy: true,
-    settings: {
-      // eveEnabled: false,
-      maxImageSizeAllowed: maxImageSize,
-      maxFileSizeAllowed: '500000000',
-    },
-    eveConnector: {
-      deploy: false,
-    },
-    resources: {
-      requests: {
-        'ephemeral-storage': ephemeralStorageRequestGigabytes,
-      },
-      limits: {
-        cpu: '1000m',
-        memory: memoryLimitGigabytes,
-        'ephemeral-storage': ephemeralStorageLimitGigabytes,
-      },
-    },
-  }
-
-  if (params.platform === "ocp") {
-    nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.runtimeScanner.env = {
-      SCANNER_RUN_TIMEOUT: "3h",
-    }
-  }
-  
-  return nodeAnalyzerConfigs
-}
-
-function setNodeAnalyzerConfigsImageAnalyzer(params, nodeAnalyzerConfigs) {
-  nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.imageAnalyzer = {
-    deploy: true,
-  }
-  return nodeAnalyzerConfigs
-}
-
-function setNodeAnalyzerConfigsHostAnalyzer(params, nodeAnalyzerConfigs) {
-  nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.hostAnalyzer = {
-    deploy: true,
-  }
-  return nodeAnalyzerConfigs
-}
-
-function setNodeAnalyzerConfigsBenchmarkRunner(params, nodeAnalyzerConfigs) {
-  nodeAnalyzerConfigs.nodeAnalyzer.nodeAnalyzer.benchmarkRunner = {
-    deploy: true,
-  }
-  return nodeAnalyzerConfigs
 }
 
 function setNodeAnalyzerConfigsKSPMAnalyzer(params, nodeAnalyzerConfigs) {
@@ -645,7 +552,7 @@ function setKSPMCollectorConfigs(params) {
     }
   }
 
-  if (params.priorityCheckbox.checked){
+  if (params.priorityCheckbox.checked) {
     kspmCollectorConfigs.kspmCollector.priorityClassName = params.priorityInput
   }
 
@@ -706,10 +613,9 @@ function addTagLine() {
 }
 
 // Needed to trigger yaml generation after all elements have loaded.
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   updateOutput()
 }, false);
-
 
 function updateOutput() {
   let helmCommandLineInstall = generateHelmCommandLineInstall()
@@ -735,90 +641,20 @@ function updateOutput() {
 }
 
 function generateYaml() {
-  // Retrieve user inputs
-  // const params = {
-  //   namespaceInput: document.querySelector('#namespaceInput input').value,
-  //   accessKeyInput: document.querySelector('#accessKeyInput input').value,
-  //   clusterNameInput: document.querySelector('#clusterNameInput input').value,
-  //   agentProfileInput: document.getElementById('profileSelect').value,
-  //   clusterTags: {},
-  //   proxyCheckbox: document.getElementById('proxyCheckbox'),
-  //   proxyInputs: document.getElementById('proxyInput').getElementsByTagName('input'),
-  //   registryCheckbox: document.getElementById('registryCheckbox'),
-  //   registryInputs: document.getElementById('registryInput').getElementsByTagName('input'),
-  //   priorityCheckbox: document.getElementById('priorityCheckbox'),
-  //   priorityInput: document.querySelector('#priorityInput input').value,
-  //   nodeAnalyzerCheckbox: document.getElementById('nodeAnalyzerCheckbox'),
-  //   admissionControllerCheckbox: document.getElementById('admissionControllerCheckbox'),
-  //   kspmCheckbox: document.getElementById('kspmCheckbox'),
-  //   rapidResponseCheckbox: document.getElementById('rapidResponseCheckbox'),
-  //   nodeAnalyzerCheckbox: document.getElementById('nodeAnalyzerCheckbox'),
-  //   hostScannerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[0],
-  //   runtimeScannerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[1],
-  //   imageAnalyzerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[2],
-  //   hostAnalyzerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[3],
-  //   benchmarkRunnerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[4],
-  //   imageSizeInput: document.querySelector('#imageSizeInput input'),
-  //   agentMemoryInput: document.querySelector('#agentMemoryInput input'),
-  //   regionInput: '',
-  //   customCollectorUrl: '',
-  //   customCollectorPort: '',
-  // }
-
-  // const regionSelect = document.getElementById('regionSelect');
-  // if (regionSelect.value === 'custom') {
-  //   params.regionInput = "custom";
-  //   params.customCollectorUrl = document.getElementById('customCollectorUrl').value;
-  //   params.customCollectorPort = document.getElementById('customCollectorPort').value;
-  // } else {
-  //   params.regionInput = regionSelect.value;
-  // }
-
-  // // Validate required inputs
-  // if (!params.namespaceInput || !params.accessKeyInput || !params.regionInput || !params.clusterNameInput) {
-  //   return 'Please fill in all required fields.';
-  // }
-
-  // const clusterTagElements = document.getElementById('tagLines').children;
-  // for (let i = 0; i < clusterTagElements.length; i++) {
-  //   const key = clusterTagElements[i].getElementsByTagName('input')[0].value;
-  //   const value = clusterTagElements[i].getElementsByTagName('input')[1].value;
-
-  //   if (key && value) {
-  //     params.clusterTags[key] = value;
-  //   }
-  // }
 
   params = generateUserInputParamObject()
 
   const globalConfigs = setGlobalConfigs(params)
   const agentConfigs = setAgentConfigs(params)
-  let nodeAnalyzerConfigs = "";
-  let rapidResponseConfigs = "";
-  let kspmCollectorConfigs = "";
-  let admissionControllerConfigs = "";
-  // if (nodeAnalyzerCheckbox.checked) {
-  //   nodeAnalyzerConfigs = setNodeAnalyzerConfigs(params)
-  // }
   nodeAnalyzerConfigs = setNodeAnalyzerConfigs(params)
-  // if (rapidResponseCheckbox.checked) {
-  //   rapidResponseConfigs = setRapidResponseConfigs(params)
-  // }
-  // if (kspmCheckbox.checked) {
-  //   kspmCollectorConfigs = setKSPMCollectorConfigs(params)
-  // }
-
-  // if (admissionControllerCheckbox.checked) {
-  //   admissionControllerConfigs = setAdmissionControllerConfigs(params)
-  // }
+  clusterShieldConfigs = setClusterShieldConfigs(params)
+  
 
   const data = {
     ...globalConfigs,
     ...agentConfigs,
     ...nodeAnalyzerConfigs,
-    // ...rapidResponseConfigs,
-    // ...kspmCollectorConfigs,
-    // ...admissionControllerConfigs
+    ...clusterShieldConfigs,
   };
 
   return jsyaml.dump(data);
@@ -832,69 +668,38 @@ function generateUserInputParamObject() {
     vsadId: document.getElementById('vsad').value.toLowerCase(),
     vastId: document.getElementById('vast').value.toLowerCase(),
     agentTagsSelect: document.getElementById('agentTags'),
-    runtimeScannerTagsSelect: document.getElementById('runtimeScannerTags'),
     namespaceInput: document.querySelector('#namespaceInput input').value,
     accessKeyInput: document.querySelector('#accessKeyInput input').value,
-    // clusterNameInput: document.querySelector('#clusterNameInput input').value,
-    // agentProfileInput: document.getElementById('profileSelect').value,
-    // clusterTags: {},
     proxyCheckbox: document.getElementById('proxyCheckbox'),
     proxyInputs: document.getElementById('proxyInput').getElementsByTagName('input'),
     registryCheckbox: document.getElementById('registryCheckbox'),
     registryInputs: document.getElementById('registryInput').getElementsByTagName('input'),
     priorityCheckbox: document.getElementById('priorityCheckbox'),
     priorityInput: document.querySelector('#priorityInput input').value,
-    // nodeAnalyzerCheckbox: document.getElementById('nodeAnalyzerCheckbox'),
-    // admissionControllerCheckbox: document.getElementById('admissionControllerCheckbox'),
-    // kspmCheckbox: document.getElementById('kspmCheckbox'),
-    // rapidResponseCheckbox: document.getElementById('rapidResponseCheckbox'),
-    // nodeAnalyzerCheckbox: document.getElementById('nodeAnalyzerCheckbox'),
-    // hostScannerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[0],
-    // runtimeScannerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[1],
-    // imageAnalyzerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[2],
-    // hostAnalyzerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[3],
-    // benchmarkRunnerCheckbox: document.getElementById('nodeAnalyzerInput').getElementsByTagName('input')[4],
     imageSizeInput: document.querySelector('#imageSizeInput input'),
-    // agentMemoryInput: document.querySelector('#agentMemoryInput input'),
-    // regionInput: '',
     customCollectorUrl: '',
     customCollectorPort: '',
+    clusterShieldTagsSelect: document.getElementById('clusterShieldTags'),
+    enablePosture: document.getElementById('postureCheckbox'),
+    enableAudit: document.getElementById('auditCheckbox'),
+    enableAdmissionControl: document.getElementById('admissionControllerCheckbox')
   }
-
-  // const regionSelect = document.getElementById('regionSelect');
-  // if (regionSelect.value === 'custom') {
-  //   params.regionInput = "custom";
-  //   params.customCollectorUrl = document.getElementById('customCollectorUrl').value;
-  //   params.customCollectorPort = document.getElementById('customCollectorPort').value;
-  // } else {
-  //   params.regionInput = regionSelect.value;
-  // }
 
   // Validate required inputs
   if (!params.namespaceInput || !params.accessKeyInput) {
     return 'Please fill in all required fields.';
   }
 
-  // const clusterTagElements = document.getElementById('tagLines').children;
-  // for (let i = 0; i < clusterTagElements.length; i++) {
-  //   const key = clusterTagElements[i].getElementsByTagName('input')[0].value;
-  //   const value = clusterTagElements[i].getElementsByTagName('input')[1].value;
-
-  //   if (key && value) {
-  //     params.clusterTags[key] = value;
-  //   }
-  // }
-
   return params
 }
 
 function generateHelmCommandLineInstall() {
   params = generateUserInputParamObject()
-  let helmCommands = "helm upgrade -i --create-namespace sysdig-agent \\"
+  let helmCommands = "helm upgrade -i --create-namespace " + params.namespaceInput + " \\"
   helmCommands += "<br>&nbsp;&nbsp; --namespace " + params.namespaceInput + " \\";
   helmCommands += setHelmCommandGlobalConfigs(params)
   helmCommands += setHelmCommandAgentConfigs(params)
-  helmCommands += setHelmCommandNodeAnalyzerRuntimeConfigs(params)
+  helmCommands += setHelmCommandClusterShield(params)
   helmCommands += "<br>&nbsp;&nbsp; -f static-configs.yaml \\";
   helmCommands += "<br>sysdig/sysdig-deploy";
   return helmCommands
@@ -989,46 +794,6 @@ function showTab(tabId) {
   document.querySelector('[onclick="showTab(\'' + tabId + '\')"]').classList.add("active-tab");
 }
 
-// function autoPopulateClusterName(params) {
-//   // const businessUnit = document.getElementById('businessUnit').value.toLowerCase();
-//   // const environment = document.getElementById('environmentSelect').value.toLowerCase();
-//   // const platform = document.getElementById('platformSelect').value.toLowerCase();
-//   // const vsadId = document.getElementById('vsad').value.toLowerCase();
-//   // const vastId = document.getElementById('vast').value.toLowerCase();
-
-//   // const clusterNameInput = document.getElementById('clusterName');
-//   const nameParts = [];
-
-//   if (params.businessUnit) {
-//     nameParts.push(params.businessUnit);
-//   }
-//   if (params.platform) {
-//     nameParts.push(params.platform);
-//   }
-//   if (params.environment) {
-//     nameParts.push(params.environment);
-//   }
-//   if (params.vastId) {
-//     nameParts.push(params.vastId);
-//   }
-//   if (params.vsadId) {
-//     nameParts.push(params.vsadId);
-//   }
-
-
-//   const clusterName = nameParts.join('-');
-//   params.clusterNameInput = clusterName;
-//   // updateOutput()
-//   return params
-// }
-
-// // // Add input event listeners to related input fields
-// const inputFields = document.querySelectorAll('#businessUnit, #environment, #platform, #vsad, #vast');
-// let params = generateUserInputParamObject()
-// inputFields.forEach(function (inputField) {
-//   inputField.addEventListener('input', autoPopulateClusterName(params));
-// });
-
 // Function to fetch the tags from the Quay.io repository and populate the dropdown
 function populateTagOptions() {
   const dropdown = document.getElementById('agentTags');
@@ -1069,9 +834,9 @@ window.addEventListener('DOMContentLoaded', populateTagOptions);
 
 // Function to fetch the tags from the Quay.io repository and populate the dropdown
 function populateRuntimeScannerTagOptions() {
-  const dropdown = document.getElementById('runtimeScannerTags');
+  const dropdown = document.getElementById('clusterShieldTags');
 
-  fetch('https://quay.io/api/v1/repository/sysdig/vuln-runtime-scanner/tag/', {
+  fetch('https://quay.io/api/v1/repository/sysdig/cluster-shield/tag/', {
     headers: {
       'X-Requested-With': 'XMLHttpRequest'
     }
@@ -1124,11 +889,6 @@ function compareVersions(a, b) {
   return -1;
 }
 
-// Function to format the tag version in "1.5.1" format
-// function formatRuntimeScannerTagVersion(tag) {
-//   const versionParts = tag.split('-');
-//   return versionParts[0];
-// }
 
 window.addEventListener('DOMContentLoaded', populateRuntimeScannerTagOptions);
 
